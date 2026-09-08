@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Inventory</title>
+    <style>
+        :root { --ink: #172033; --muted: #667085; --line: #d9e2ec; --brand: #1769aa; --danger: #b42318; --success: #067647; --page: #f4f7fb; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); font-family: Arial, sans-serif; }
+        .page { max-width: 1200px; margin: auto; padding: 24px; }
+        .panel { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .topbar, .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        h1, h2 { margin-top: 0; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        a { color: var(--brand); font-weight: 700; text-decoration: none; }
+        .toolbar input, input, select { padding: 10px 12px; border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+        .toolbar input { width: 320px; }
+        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+        button { border: 0; border-radius: 5px; padding: 10px 14px; color: white; background: var(--brand); cursor: pointer; font-weight: 700; }
+        .message { min-height: 20px; color: var(--danger); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+        th { background: #edf5fc; }
+        .status { font-weight: 700; }
+        .status.available { color: var(--success); }
+        .status.low-stock { color: var(--danger); }
+        .empty { color: var(--muted); text-align: center; }
+        @media (max-width: 800px) { .topbar, .toolbar { align-items: stretch; flex-direction: column; } .toolbar input { width: 100%; } .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel topbar">
+            <h1>Raw Materials and Inventory</h1>
+            <nav class="nav-links" aria-label="ERP modules">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/products">Products</a>
+                <a href="/suppliers">Suppliers</a>
+                <a href="/purchase">Purchase</a>
+                <a href="/production">Production</a>
+            </nav>
+        </section>
+
+        <section class="panel">
+            <h2>Add Material</h2>
+            <form id="materialForm">
+                <div class="form-grid">
+                    <label>Code <input id="code" required placeholder="RM-004"></label>
+                    <label>Name <input id="name" required placeholder="Aluminium"></label>
+                    <label>Category <input id="category" required placeholder="Metal"></label>
+                    <label>Unit <input id="unit" required placeholder="kg"></label>
+                    <label>Minimum stock <input id="minimumStock" type="number" min="0" step="0.001" required></label>
+                    <label>Opening quantity <input id="quantity" type="number" min="0" step="0.001" required></label>
+                </div>
+                <p class="message" id="formMessage" role="alert"></p>
+                <button type="submit">Save Material</button>
+            </form>
+        </section>
+
+        <section class="panel toolbar">
+            <strong id="materialCount">0 materials</strong>
+            <input id="searchInput" type="search" placeholder="Search materials">
+        </section>
+
+        <section class="panel table-wrap">
+            <table>
+                <thead><tr><th>Code</th><th>Material</th><th>Category</th><th>Quantity</th><th>Min Stock</th><th>Unit</th><th>Supplier</th><th>Status</th></tr></thead>
+                <tbody id="materialRows"></tbody>
+            </table>
+            <p class="empty" id="emptyMessage">No materials found.</p>
+        </section>
+    </main>
+
+    <script>
+        const materialForm = document.getElementById('materialForm');
+        const materialRows = document.getElementById('materialRows');
+        const searchInput = document.getElementById('searchInput');
+        const formMessage = document.getElementById('formMessage');
+
+        async function requestMaterials(url = '/api/materials', options = {}) {
+            const response = await fetch(url, options);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Inventory request failed.');
+            return result;
+        }
+
+        async function renderMaterials() {
+            try {
+                const result = await requestMaterials(`/api/materials?search=${encodeURIComponent(searchInput.value.trim())}`);
+                const materials = result.materials;
+                materialRows.innerHTML = materials.map((material) => `
+                    <tr>
+                        <td>${material.code}</td><td>${material.name}</td><td>${material.category}</td>
+                        <td>${material.quantity}</td><td>${material.minimum_stock}</td><td>${material.unit}</td>
+                        <td>${material.supplier_name || 'Not assigned'}</td>
+                        <td class="status ${material.status === 'Low Stock' ? 'low-stock' : 'available'}">${material.status}</td>
+                    </tr>
+                `).join('');
+                document.getElementById('materialCount').textContent = `${materials.length} material${materials.length === 1 ? '' : 's'}`;
+                document.getElementById('emptyMessage').hidden = materials.length > 0;
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        }
+
+        materialForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const material = {
+                code: document.getElementById('code').value.trim(),
+                name: document.getElementById('name').value.trim(),
+                category: document.getElementById('category').value.trim(),
+                unit: document.getElementById('unit').value.trim(),
+                minimum_stock: Number(document.getElementById('minimumStock').value),
+                quantity: Number(document.getElementById('quantity').value)
+            };
+            try {
+                await requestMaterials('/api/materials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(material)
+                });
+                materialForm.reset();
+                formMessage.textContent = '';
+                await renderMaterials();
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        });
+
+        searchInput.addEventListener('input', renderMaterials);
+        renderMaterials();
+    </script>
+</body>
+</html>

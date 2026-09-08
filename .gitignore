@@ -1,0 +1,59 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test, coverage, and type-checker output
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Flask and local application runtime files
+instance/
+*.log
+*.sqlite
+*.sqlite3
+
+# Generated presentation files and screenshot assets
+Manufacturing_ERP_Demo.pptx
+presentation_assets/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor and temporary files
+.vscode/*.code-snippets
+*.tmp
+*.temp
+*.swp
+*~
+venv/
+.venv/
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+instance/

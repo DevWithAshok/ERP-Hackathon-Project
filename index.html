@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Landing Page</title>
+</head>
+<style>
+    .bgcontainer{
+        background:linear-gradient( 190deg,#45dff0, #58a2f7);
+        height: 100vh;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+
+
+    }
+
+    .loginasbutton{
+        font-size: medium;
+        padding: 10px;
+        width: max-content;
+        margin: 5px;
+        color: aliceblue;
+        background-color: rgb(50, 114, 241);
+        border-radius: 8px;
+        border-width: 0px;
+        cursor: pointer;
+    }
+    .margintop{
+        margin: auto;
+    }
+
+    .buttonscontainer{
+        width: auto;
+        border-width:3px;
+        border-style: solid;
+        border-color: rgb(187, 215, 239);
+        background-color:transparent;
+        padding: 20px;
+        border-radius: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .headercontainer{
+        text-align: center;
+    }
+    .headercontainer h1{
+        font-size: 60px;
+        margin-bottom: 0px;
+        color:radial-gradient( 120deg,#45dff0, #dfe3e8);
+    }
+    /* .header{
+        color: gradient( 20deg,#45dff0, #58a2f7);
+    } */
+</style>
+<body>
+    <div class="bgcontainer">
+        <div class="headercontainer">
+            <h1 class="header">ERP</h1>
+            <p style="font-size: 25px;">An Manufacturing Company</p>
+        </div>
+
+        <div class="buttonscontainer">
+            <button class="loginasbutton" onclick="window.location.href='/login?role=Administrator'">Login As Administrator</button>
+            <button class="loginasbutton" onclick="window.location.href='/login?role=Manager'">Login As Manager</button>
+            <button class="loginasbutton" onclick="window.location.href='/login?role=Employee'">Login As Employee</button>
+        </div>
+    </div>
+</body>
+</html>

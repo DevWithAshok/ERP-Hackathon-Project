@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --ink: #172033; --muted: #667085; --line: #d9e2ec; --brand: #1769aa; --page: #f4f7fb; --panel: #fff; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); font-family: Arial, sans-serif; }
+        .page { max-width: 1250px; margin: auto; padding: 24px; }
+        .topbar, .panel, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 20px; margin-bottom: 20px; }
+        h1, h2 { margin: 0; }
+        h1 { font-size: 25px; }
+        h2 { font-size: 18px; margin-bottom: 15px; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        a { color: var(--brand); font-weight: 700; text-decoration: none; }
+        .session { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--muted); }
+        button { border: 0; border-radius: 5px; padding: 9px 13px; color: white; background: var(--brand); cursor: pointer; font-weight: 700; }
+        .logout { background: #b42318; }
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+        .card { padding: 18px; }
+        .card p { margin: 0 0 8px; color: var(--muted); }
+        .card strong { font-size: 28px; }
+        .charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .panel { padding: 18px; min-height: 300px; }
+        .chart-container { position: relative; height: 230px; }
+        .error { color: #b42318; min-height: 20px; }
+        @media (max-width: 900px) { .cards, .charts { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 620px) { .topbar, .session { align-items: stretch; flex-direction: column; } .cards, .charts { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="topbar">
+            <h1>Manufacturing ERP Dashboard</h1>
+            <nav class="nav-links" aria-label="ERP modules">
+                <a href="/products">Products</a><a href="/inventory">Inventory</a><a href="/suppliers">Suppliers</a>
+                <a href="/purchase">Purchase</a><a href="/bom">BOM</a><a href="/production">Production</a><a href="/customers">Customers</a><a href="/sales">Sales</a><a href="/notifications">Notifications</a><a href="/audit">Audit Log</a><a href="/reports">Reports</a>
+            </nav>
+        </header>
+        <div class="session"><span id="sessionMessage">Loading session...</span><button class="logout" id="logoutButton">Logout</button></div>
+        <p class="error" id="errorMessage"></p>
+        <section class="cards">
+            <div class="card"><p>Total Products</p><strong id="total_products">0</strong></div>
+            <div class="card"><p>Raw Materials</p><strong id="total_materials">0</strong></div>
+            <div class="card"><p>Low Stock</p><strong id="low_stock">0</strong></div>
+            <div class="card"><p>Pending Purchases</p><strong id="pending_purchases">0</strong></div>
+            <div class="card"><p>Active Production</p><strong id="active_production">0</strong></div>
+            <div class="card"><p>Completed Production</p><strong id="completed_production">0</strong></div>
+            <div class="card"><p>Pending Sales</p><strong id="pending_sales">0</strong></div>
+            <div class="card"><p>Customers</p><strong id="customers">0</strong></div>
+            <div class="card"><p>Suppliers</p><strong id="suppliers">0</strong></div>
+        </section>
+        <section class="charts">
+            <article class="panel"><h2>Inventory Status</h2><div class="chart-container"><canvas id="inventoryChart"></canvas></div></article>
+            <article class="panel"><h2>Production Status</h2><div class="chart-container"><canvas id="productionChart"></canvas></div></article>
+            <article class="panel"><h2>Order Activity</h2><div class="chart-container"><canvas id="ordersChart"></canvas></div></article>
+        </section>
+    </main>
+    <script>
+        let chartInstances = [];
+        async function requestJson(url, options = {}) { const response = await fetch(url, options); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Dashboard request failed.'); return result; }
+        async function loadDashboard() {
+            const user = await requestJson('/api/auth/me');
+            document.getElementById('sessionMessage').textContent = `Signed in as ${user.user.username} (${user.user.role})`;
+            const result = await requestJson('/api/dashboard/summary');
+            Object.entries(result.cards).forEach(([key, value]) => { document.getElementById(key).textContent = value; });
+            chartInstances.forEach((chart) => chart.destroy());
+            chartInstances = [
+                new Chart(document.getElementById('inventoryChart'), { type: 'doughnut', data: { labels: ['Available', 'Low Stock'], datasets: [{ data: [result.charts.inventory.available || 0, result.charts.inventory.low_stock || 0], backgroundColor: ['#067647', '#b42318'] }] }, options: { maintainAspectRatio: false } }),
+                new Chart(document.getElementById('productionChart'), { type: 'bar', data: { labels: result.charts.production.map((item) => item.status), datasets: [{ label: 'Orders', data: result.charts.production.map((item) => item.count), backgroundColor: '#1769aa' }] }, options: { maintainAspectRatio: false } }),
+                new Chart(document.getElementById('ordersChart'), { type: 'line', data: { labels: result.charts.orders.map((item) => item.period), datasets: [{ label: 'Orders', data: result.charts.orders.map((item) => item.count), borderColor: '#1769aa', backgroundColor: '#d9eefa' }] }, options: { maintainAspectRatio: false } })
+            ];
+        }
+        document.getElementById('logoutButton').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/login'; });
+        loadDashboard().catch((error) => { document.getElementById('errorMessage').textContent = error.message; });
+    </script>
+</body>
+</html>

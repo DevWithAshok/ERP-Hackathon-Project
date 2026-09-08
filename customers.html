@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Customers</title>
+    <style>
+        :root { --ink: #172033; --muted: #667085; --line: #d9e2ec; --brand: #1769aa; --danger: #b42318; --page: #f4f7fb; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); font-family: Arial, sans-serif; }
+        .page { max-width: 1100px; margin: auto; padding: 24px; }
+        .panel { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .topbar, .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        h1, h2 { margin-top: 0; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        a { color: var(--brand); font-weight: 700; text-decoration: none; }
+        input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+        .toolbar input { max-width: 360px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+        button { border: 0; border-radius: 5px; padding: 9px 13px; color: white; background: var(--brand); cursor: pointer; font-weight: 700; }
+        button.secondary { color: var(--ink); background: #e8eef5; }
+        button.danger { background: var(--danger); }
+        .actions { display: flex; gap: 8px; margin-top: 16px; }
+        .message { min-height: 20px; color: var(--danger); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 760px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+        th { background: #edf5fc; }
+        .empty { color: var(--muted); text-align: center; }
+        @media (max-width: 700px) { .topbar, .toolbar { align-items: stretch; flex-direction: column; } .toolbar input { max-width: none; } .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel topbar"><h1>Customers</h1><nav class="nav-links"><a href="/dashboard">Dashboard</a><a href="/sales">Sales</a></nav></section>
+        <section class="panel">
+            <h2 id="formTitle">Add Customer</h2>
+            <form id="customerForm"><div class="form-grid">
+                <label>Customer code <input id="code" required placeholder="CUS-002"></label>
+                <label>Customer name <input id="name" required placeholder="New Customer"></label>
+                <label>Phone <input id="phone" required type="tel"></label>
+                <label>Email <input id="email" required type="email"></label>
+                <label>Address <input id="address" required></label>
+            </div><p class="message" id="formMessage" role="alert"></p><div class="actions"><button type="submit">Save Customer</button><button class="secondary" id="cancelEdit" type="button" hidden>Cancel edit</button></div></form>
+        </section>
+        <section class="panel toolbar"><strong id="customerCount">0 customers</strong><input id="searchInput" type="search" placeholder="Search customers"></section>
+        <section class="panel table-wrap"><table><thead><tr><th>Code</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Actions</th></tr></thead><tbody id="customerRows"></tbody></table><p class="empty" id="emptyMessage">No customers found.</p></section>
+    </main>
+    <script>
+        const form = document.getElementById('customerForm');
+        const rows = document.getElementById('customerRows');
+        const search = document.getElementById('searchInput');
+        const message = document.getElementById('formMessage');
+        const cancel = document.getElementById('cancelEdit');
+        let editingId = null;
+        let customers = [];
+        async function requestJson(url, options = {}) { const response = await fetch(url, options); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Customer request failed.'); return result; }
+        async function render() { try { const result = await requestJson(`/api/customers?search=${encodeURIComponent(search.value.trim())}`); customers = result.customers; rows.innerHTML = customers.map((item) => `<tr><td>${item.code}</td><td>${item.name}</td><td>${item.phone}</td><td>${item.email}</td><td>${item.address}</td><td><button type="button" data-edit="${item.id}">Edit</button> <button class="danger" type="button" data-delete="${item.id}">Deactivate</button></td></tr>`).join(''); document.getElementById('customerCount').textContent = `${customers.length} customer${customers.length === 1 ? '' : 's'}`; document.getElementById('emptyMessage').hidden = customers.length > 0; } catch (error) { message.textContent = error.message; } }
+        function reset() { form.reset(); editingId = null; document.getElementById('formTitle').textContent = 'Add Customer'; cancel.hidden = true; message.textContent = ''; }
+        form.addEventListener('submit', async (event) => { event.preventDefault(); const customer = { code: code.value.trim(), name: name.value.trim(), phone: phone.value.trim(), email: email.value.trim(), address: address.value.trim() }; try { await requestJson(editingId ? `/api/customers/${editingId}` : '/api/customers', { method: editingId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(customer) }); reset(); await render(); } catch (error) { message.textContent = error.message; } });
+        rows.addEventListener('click', async (event) => { const editId = event.target.dataset.edit; const deleteId = event.target.dataset.delete; if (editId) { const item = customers.find((customer) => customer.id === Number(editId)); code.value = item.code; name.value = item.name; phone.value = item.phone; email.value = item.email; address.value = item.address; editingId = item.id; document.getElementById('formTitle').textContent = 'Edit Customer'; cancel.hidden = false; } if (deleteId) { try { await requestJson(`/api/customers/${deleteId}`, { method: 'DELETE' }); await render(); } catch (error) { message.textContent = error.message; } } });
+        cancel.addEventListener('click', reset); search.addEventListener('input', render); render();
+    </script>
+</body>
+</html>

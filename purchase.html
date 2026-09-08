@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Purchase Orders</title>
+    <style>
+        :root { --ink: #172033; --muted: #667085; --line: #d9e2ec; --brand: #1769aa; --danger: #b42318; --success: #067647; --page: #f4f7fb; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); font-family: Arial, sans-serif; }
+        .page { max-width: 1150px; margin: auto; padding: 24px; }
+        .panel { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .topbar, .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        h1, h2 { margin-top: 0; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        a { color: var(--brand); font-weight: 700; text-decoration: none; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+        input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+        button { border: 0; border-radius: 5px; padding: 10px 14px; color: white; background: var(--brand); cursor: pointer; font-weight: 700; }
+        .message { min-height: 20px; color: var(--danger); }
+        .total { color: var(--success); font-size: 18px; font-weight: 700; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+        th { background: #edf5fc; }
+        .status { font-weight: 700; }
+        .status.ordered { color: #9a6700; }
+        .status.received { color: var(--success); }
+        .empty { color: var(--muted); text-align: center; }
+        @media (max-width: 720px) { .topbar, .toolbar { align-items: stretch; flex-direction: column; } .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel topbar">
+            <h1>Purchase Orders</h1>
+            <nav class="nav-links" aria-label="ERP modules">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/suppliers">Suppliers</a>
+                <a href="/inventory">Inventory</a>
+                <a href="/production">Production</a>
+            </nav>
+        </section>
+
+        <section class="panel">
+            <h2>Create Purchase Order</h2>
+            <form id="purchaseForm">
+                <div class="form-grid">
+                    <label>Supplier <select id="supplierId" required></select></label>
+                    <label>Material <select id="materialId" required></select></label>
+                    <label>Quantity <input id="quantity" type="number" min="0.001" step="0.001" required></label>
+                    <label>Unit price <input id="unitPrice" type="number" min="0" step="0.01" required></label>
+                </div>
+                <p class="total" id="orderTotal">Total: Rs. 0.00</p>
+                <p class="message" id="formMessage" role="alert"></p>
+                <button type="submit">Create Purchase Order</button>
+            </form>
+        </section>
+
+        <section class="panel table-wrap">
+            <div class="toolbar"><h2>Purchase Orders</h2><strong id="orderCount">0 orders</strong></div>
+            <table>
+                <thead><tr><th>Order</th><th>Supplier</th><th>Material</th><th>Quantity</th><th>Total</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="purchaseRows"></tbody>
+            </table>
+            <p class="empty" id="emptyMessage">No purchase orders found.</p>
+        </section>
+    </main>
+
+    <script>
+        const purchaseForm = document.getElementById('purchaseForm');
+        const supplierSelect = document.getElementById('supplierId');
+        const materialSelect = document.getElementById('materialId');
+        const quantityInput = document.getElementById('quantity');
+        const unitPriceInput = document.getElementById('unitPrice');
+        const orderTotal = document.getElementById('orderTotal');
+        const purchaseRows = document.getElementById('purchaseRows');
+        const formMessage = document.getElementById('formMessage');
+
+        async function requestJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Purchase request failed.');
+            return result;
+        }
+
+        async function loadOptions() {
+            const [suppliers, materials] = await Promise.all([
+                requestJson('/api/suppliers'),
+                requestJson('/api/materials')
+            ]);
+            supplierSelect.innerHTML = suppliers.suppliers.map((supplier) =>
+                `<option value="${supplier.id}">${supplier.name} (${supplier.code})</option>`).join('');
+            materialSelect.innerHTML = materials.materials.map((material) =>
+                `<option value="${material.id}">${material.name} (${material.unit})</option>`).join('');
+        }
+
+        function updateTotal() {
+            orderTotal.textContent = `Total: Rs. ${(Number(quantityInput.value || 0) * Number(unitPriceInput.value || 0)).toFixed(2)}`;
+        }
+
+        async function renderPurchases() {
+            try {
+                const result = await requestJson('/api/purchases');
+                purchaseRows.innerHTML = result.purchases.map((order) => `
+                    <tr><td>${order.order_number}</td><td>${order.supplier_name}</td><td>${order.material_name}</td>
+                    <td>${order.quantity}</td><td>Rs. ${Number(order.total).toFixed(2)}</td>
+                    <td class="status ${order.status.toLowerCase()}">${order.status}</td><td>
+                    ${order.status === 'Ordered' ? `<button type="button" data-receive="${order.id}">Receive Material</button>` : 'Inventory updated'}
+                    </td></tr>
+                `).join('');
+                document.getElementById('orderCount').textContent = `${result.purchases.length} order${result.purchases.length === 1 ? '' : 's'}`;
+                document.getElementById('emptyMessage').hidden = result.purchases.length > 0;
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        }
+
+        purchaseForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            try {
+                await requestJson('/api/purchases', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        supplier_id: supplierSelect.value,
+                        material_id: materialSelect.value,
+                        quantity: Number(quantityInput.value),
+                        unit_price: Number(unitPriceInput.value)
+                    })
+                });
+                purchaseForm.reset();
+                formMessage.textContent = '';
+                updateTotal();
+                await renderPurchases();
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        });
+
+        purchaseRows.addEventListener('click', async function (event) {
+            const purchaseId = event.target.dataset.receive;
+            if (!purchaseId) return;
+            try {
+                // Receiving is the point where the backend transaction increases stock.
+                await requestJson(`/api/purchases/${purchaseId}/receive`, { method: 'POST' });
+                formMessage.textContent = '';
+                await renderPurchases();
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        });
+
+        quantityInput.addEventListener('input', updateTotal);
+        unitPriceInput.addEventListener('input', updateTotal);
+        Promise.all([loadOptions(), renderPurchases()]).catch((error) => { formMessage.textContent = error.message; });
+    </script>
+</body>
+</html>

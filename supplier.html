@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Suppliers</title>
+    <style>
+        :root { --ink: #172033; --muted: #667085; --line: #d9e2ec; --brand: #1769aa; --danger: #b42318; --page: #f4f7fb; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); font-family: Arial, sans-serif; }
+        .page { max-width: 1150px; margin: auto; padding: 24px; }
+        .panel { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .topbar, .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        h1, h2 { margin-top: 0; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        a { color: var(--brand); font-weight: 700; text-decoration: none; }
+        .toolbar input, input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+        .toolbar input { max-width: 360px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+        button { border: 0; border-radius: 5px; padding: 10px 14px; color: white; background: var(--brand); cursor: pointer; font-weight: 700; }
+        button.secondary { color: var(--ink); background: #e8eef5; }
+        button.danger { background: var(--danger); }
+        .actions { display: flex; gap: 8px; margin-top: 16px; }
+        .message { min-height: 20px; color: var(--danger); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+        th { background: #edf5fc; }
+        .empty { color: var(--muted); text-align: center; }
+        @media (max-width: 720px) { .topbar, .toolbar { align-items: stretch; flex-direction: column; } .toolbar input { max-width: none; } .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel topbar">
+            <h1>Suppliers</h1>
+            <nav class="nav-links" aria-label="ERP modules">
+                <a href="/dashboard">Dashboard</a>
+                <a href="/inventory">Inventory</a>
+                <a href="/purchase">Purchase</a>
+            </nav>
+        </section>
+
+        <section class="panel">
+            <h2 id="formTitle">Add Supplier</h2>
+            <form id="supplierForm">
+                <div class="form-grid">
+                    <label>Supplier code <input id="code" required placeholder="SUP-002"></label>
+                    <label>Supplier name <input id="name" required placeholder="Precision Parts"></label>
+                    <label>Phone <input id="phone" required type="tel"></label>
+                    <label>Email <input id="email" required type="email"></label>
+                    <label>Address <input id="address" required></label>
+                </div>
+                <p class="message" id="formMessage" role="alert"></p>
+                <div class="actions">
+                    <button type="submit">Save Supplier</button>
+                    <button class="secondary" id="cancelEdit" type="button" hidden>Cancel edit</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel toolbar">
+            <strong id="supplierCount">0 suppliers</strong>
+            <input id="searchInput" type="search" placeholder="Search suppliers">
+        </section>
+
+        <section class="panel table-wrap">
+            <table>
+                <thead><tr><th>Code</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Actions</th></tr></thead>
+                <tbody id="supplierRows"></tbody>
+            </table>
+            <p class="empty" id="emptyMessage">No suppliers found.</p>
+        </section>
+    </main>
+
+    <script>
+        const supplierForm = document.getElementById('supplierForm');
+        const supplierRows = document.getElementById('supplierRows');
+        const searchInput = document.getElementById('searchInput');
+        const formMessage = document.getElementById('formMessage');
+        const cancelEdit = document.getElementById('cancelEdit');
+        let editingSupplierId = null;
+        let suppliers = [];
+
+        async function requestSuppliers(url = '/api/suppliers', options = {}) {
+            const response = await fetch(url, options);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Supplier request failed.');
+            return result;
+        }
+
+        async function renderSuppliers() {
+            try {
+                const result = await requestSuppliers(`/api/suppliers?search=${encodeURIComponent(searchInput.value.trim())}`);
+                suppliers = result.suppliers;
+                supplierRows.innerHTML = suppliers.map((supplier) => `
+                    <tr><td>${supplier.code}</td><td>${supplier.name}</td><td>${supplier.phone}</td>
+                    <td>${supplier.email}</td><td>${supplier.address}</td><td>
+                    <button type="button" data-edit="${supplier.id}">Edit</button>
+                    <button class="danger" type="button" data-delete="${supplier.id}">Deactivate</button></td></tr>
+                `).join('');
+                document.getElementById('supplierCount').textContent = `${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'}`;
+                document.getElementById('emptyMessage').hidden = suppliers.length > 0;
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        }
+
+        function resetForm() {
+            supplierForm.reset();
+            editingSupplierId = null;
+            document.getElementById('formTitle').textContent = 'Add Supplier';
+            cancelEdit.hidden = true;
+            formMessage.textContent = '';
+        }
+
+        supplierForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const supplier = {
+                code: document.getElementById('code').value.trim(),
+                name: document.getElementById('name').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                address: document.getElementById('address').value.trim()
+            };
+            try {
+                await requestSuppliers(editingSupplierId ? `/api/suppliers/${editingSupplierId}` : '/api/suppliers', {
+                    method: editingSupplierId ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(supplier)
+                });
+                resetForm();
+                await renderSuppliers();
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        });
+
+        supplierRows.addEventListener('click', async function (event) {
+            const editId = event.target.dataset.edit;
+            const deleteId = event.target.dataset.delete;
+            if (editId) {
+                const supplier = suppliers.find((item) => item.id === Number(editId));
+                document.getElementById('code').value = supplier.code;
+                document.getElementById('name').value = supplier.name;
+                document.getElementById('phone').value = supplier.phone;
+                document.getElementById('email').value = supplier.email;
+                document.getElementById('address').value = supplier.address;
+                editingSupplierId = supplier.id;
+                document.getElementById('formTitle').textContent = 'Edit Supplier';
+                cancelEdit.hidden = false;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            if (deleteId) {
+                try {
+                    await requestSuppliers(`/api/suppliers/${deleteId}`, { method: 'DELETE' });
+                    await renderSuppliers();
+                } catch (error) {
+                    formMessage.textContent = error.message;
+                }
+            }
+        });
+
+        cancelEdit.addEventListener('click', resetForm);
+        searchInput.addEventListener('input', renderSuppliers);
+        renderSuppliers();
+    </script>
+</body>
+</html>

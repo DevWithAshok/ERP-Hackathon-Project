@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Products</title>
+    <style>
+        :root {
+            --ink: #172033;
+            --muted: #667085;
+            --line: #d9e2ec;
+            --panel: #ffffff;
+            --brand: #1769aa;
+            --danger: #b42318;
+            --page: #f4f7fb;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: var(--page);
+            font-family: Arial, sans-serif;
+        }
+        .page { max-width: 1180px; margin: 0 auto; padding: 24px; }
+        .topbar, .toolbar, .form-panel, .table-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+        .topbar h1 { margin: 0; font-size: 24px; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        .nav-links a { color: var(--brand); text-decoration: none; font-weight: 700; }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .toolbar input, .form-grid input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            font: inherit;
+        }
+        .toolbar input { max-width: 360px; }
+        .form-panel { padding: 20px; margin-bottom: 20px; }
+        .form-panel h2 { margin-top: 0; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+        .form-field { display: flex; flex-direction: column; gap: 6px; }
+        .form-field label { font-weight: 700; }
+        .form-actions { display: flex; gap: 10px; margin-top: 16px; }
+        button {
+            border: 0;
+            border-radius: 5px;
+            padding: 10px 14px;
+            color: white;
+            background: var(--brand);
+            cursor: pointer;
+            font: inherit;
+            font-weight: 700;
+        }
+        button.secondary { color: var(--ink); background: #e8eef5; }
+        button.danger { background: var(--danger); }
+        .table-panel { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 680px; }
+        th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid var(--line); }
+        th { background: #edf5fc; }
+        .status { color: #067647; font-weight: 700; }
+        .empty { padding: 24px; text-align: center; color: var(--muted); }
+        .message { min-height: 22px; margin: 12px 0 0; color: var(--danger); }
+        @media (max-width: 760px) {
+            .topbar, .toolbar { align-items: stretch; flex-direction: column; }
+            .form-grid { grid-template-columns: 1fr; }
+            .toolbar input { max-width: none; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <header class="topbar">
+            <h1>Products</h1>
+            <nav class="nav-links" aria-label="ERP modules">
+                <a href="dashboard.html">Dashboard</a>
+                <a href="rawmaterial.html">Inventory</a>
+                <a href="supplier.html">Suppliers</a>
+                <a href="purchase.html">Purchase</a>
+                <a href="production.html">Production</a>
+                <a href="sales.html">Sales</a>
+            </nav>
+        </header>
+
+        <section class="toolbar">
+            <strong id="productCount">0 products</strong>
+            <label>
+                <span class="visually-hidden">Search products</span>
+                <input id="searchInput" type="search" placeholder="Search by code, name, or category">
+            </label>
+        </section>
+
+        <section class="form-panel">
+            <h2 id="formTitle">Add Product</h2>
+            <form id="productForm">
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="productCode">Product code</label>
+                        <input id="productCode" name="productCode" required placeholder="FG-001">
+                    </div>
+                    <div class="form-field">
+                        <label for="productName">Product name</label>
+                        <input id="productName" name="productName" required placeholder="Gear Assembly">
+                    </div>
+                    <div class="form-field">
+                        <label for="category">Category</label>
+                        <input id="category" name="category" required placeholder="Mechanical">
+                    </div>
+                    <div class="form-field">
+                        <label for="price">Selling price</label>
+                        <input id="price" name="price" type="number" min="0" step="0.01" required placeholder="2500">
+                    </div>
+                </div>
+                <p class="message" id="formMessage" role="alert"></p>
+                <div class="form-actions">
+                    <button type="submit">Save Product</button>
+                    <button class="secondary" id="cancelEdit" type="button" hidden>Cancel edit</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="table-panel">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="productRows"></tbody>
+            </table>
+            <p class="empty" id="emptyMessage">No products found.</p>
+        </section>
+    </main>
+
+    <script>
+        const productForm = document.getElementById('productForm');
+        const productRows = document.getElementById('productRows');
+        const searchInput = document.getElementById('searchInput');
+        const formMessage = document.getElementById('formMessage');
+        const formTitle = document.getElementById('formTitle');
+        const cancelEdit = document.getElementById('cancelEdit');
+        let editingProductId = null;
+        let products = [];
+
+        async function requestProducts(url = '/api/products', options = {}) {
+            const response = await fetch(url, options);
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Product request failed.');
+            return result;
+        }
+
+        async function renderProducts() {
+            try {
+                const result = await requestProducts(`/api/products?search=${encodeURIComponent(searchInput.value.trim())}`);
+                products = result.products;
+            } catch (error) {
+                formMessage.textContent = error.message;
+                return;
+            }
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            const visibleProducts = products.filter((product) => [product.code, product.name, product.category]
+                .some((value) => value.toLowerCase().includes(searchTerm)));
+
+            productRows.innerHTML = visibleProducts.map((product) => `
+                <tr>
+                    <td>${product.code}</td>
+                    <td>${product.name}</td>
+                    <td>${product.category}</td>
+                    <td>Rs. ${Number(product.price).toFixed(2)}</td>
+                    <td class="status">Active</td>
+                    <td>
+                        <button type="button" data-edit="${product.id}">Edit</button>
+                        <button class="danger" type="button" data-delete="${product.id}">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('productCount').textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
+            document.getElementById('emptyMessage').hidden = visibleProducts.length > 0;
+        }
+
+        function resetForm() {
+            productForm.reset();
+            editingProductId = null;
+            formTitle.textContent = 'Add Product';
+            cancelEdit.hidden = true;
+            formMessage.textContent = '';
+        }
+
+        productForm.addEventListener('submit', async function (event) {
+            // Send the form to Flask; MySQL is now the source of truth.
+            event.preventDefault();
+            const formData = new FormData(productForm);
+            const product = {
+                code: formData.get('productCode').trim(),
+                name: formData.get('productName').trim(),
+                category: formData.get('category').trim(),
+                price: Number(formData.get('price'))
+            };
+            if (!product.code || !product.name || !product.category || product.price < 0) {
+                formMessage.textContent = 'Enter valid values in every product field.';
+                return;
+            }
+
+            try {
+                await requestProducts(editingProductId ? `/api/products/${editingProductId}` : '/api/products', {
+                    method: editingProductId ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(product)
+                });
+                resetForm();
+                await renderProducts();
+            } catch (error) {
+                formMessage.textContent = error.message;
+            }
+        });
+
+        productRows.addEventListener('click', async function (event) {
+            const editId = event.target.dataset.edit;
+            const deleteId = event.target.dataset.delete;
+
+            if (editId) {
+                const product = products.find((item) => item.id === editId);
+                document.getElementById('productCode').value = product.code;
+                document.getElementById('productName').value = product.name;
+                document.getElementById('category').value = product.category;
+                document.getElementById('price').value = product.price;
+                editingProductId = product.id;
+                formTitle.textContent = 'Edit Product';
+                cancelEdit.hidden = false;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            if (deleteId) {
+                try {
+                    await requestProducts(`/api/products/${deleteId}`, { method: 'DELETE' });
+                    await renderProducts();
+                } catch (error) {
+                    formMessage.textContent = error.message;
+                }
+            }
+        });
+
+        cancelEdit.addEventListener('click', resetForm);
+        searchInput.addEventListener('input', renderProducts);
+        renderProducts();
+    </script>
+</body>
+</html>

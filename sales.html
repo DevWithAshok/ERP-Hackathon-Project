@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Sales</title>
+    <style>
+        :root { --ink: #172033; --muted: #667085; --line: #d9e2ec; --brand: #1769aa; --danger: #b42318; --success: #067647; --page: #f4f7fb; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: var(--ink); background: var(--page); font-family: Arial, sans-serif; }
+        .page { max-width: 1150px; margin: auto; padding: 24px; }
+        .panel { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .topbar, .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+        h1, h2 { margin-top: 0; }
+        .nav-links { display: flex; flex-wrap: wrap; gap: 12px; }
+        a { color: var(--brand); font-weight: 700; text-decoration: none; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+        input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 5px; font: inherit; }
+        button { border: 0; border-radius: 5px; padding: 10px 14px; color: white; background: var(--brand); cursor: pointer; font-weight: 700; }
+        .message { min-height: 20px; color: var(--danger); }
+        .total { color: var(--success); font-size: 18px; font-weight: 700; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+        th { background: #edf5fc; }
+        .status { font-weight: 700; }
+        .status.pending { color: #9a6700; }
+        .status.processed { color: var(--success); }
+        .empty { color: var(--muted); text-align: center; }
+        @media (max-width: 720px) { .topbar, .toolbar { align-items: stretch; flex-direction: column; } .form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel topbar"><h1>Sales Orders</h1><nav class="nav-links"><a href="/dashboard">Dashboard</a><a href="/customers">Customers</a><a href="/production">Production</a></nav></section>
+        <section class="panel"><h2>Create Sales Order</h2><form id="salesForm"><div class="form-grid">
+            <label>Customer <select id="customerId" required></select></label>
+            <label>Product <select id="productId" required></select></label>
+            <label>Quantity <input id="quantity" type="number" min="0.001" step="0.001" required></label>
+            <label>Unit price <input id="unitPrice" type="number" min="0" step="0.01" readonly></label>
+        </div><p class="total" id="orderTotal">Total: Rs. 0.00</p><p class="message" id="formMessage" role="alert"></p><button type="submit">Create Sales Order</button></form></section>
+        <section class="panel table-wrap"><div class="toolbar"><h2>Sales Orders</h2><strong id="orderCount">0 orders</strong></div><table><thead><tr><th>Order</th><th>Customer</th><th>Product</th><th>Quantity</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="salesRows"></tbody></table><p class="empty" id="emptyMessage">No sales orders found.</p></section>
+    </main>
+    <script>
+        const customerSelect = document.getElementById('customerId'); const productSelect = document.getElementById('productId'); const quantity = document.getElementById('quantity'); const unitPrice = document.getElementById('unitPrice'); const total = document.getElementById('orderTotal'); const rows = document.getElementById('salesRows'); const message = document.getElementById('formMessage'); let products = [];
+        async function requestJson(url, options = {}) { const response = await fetch(url, options); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Sales request failed.'); return result; }
+        async function loadOptions() { const [customers, productResult] = await Promise.all([requestJson('/api/customers'), requestJson('/api/products')]); customerSelect.innerHTML = customers.customers.map((item) => `<option value="${item.id}">${item.name} (${item.code})</option>`).join(''); products = productResult.products; productSelect.innerHTML = products.map((item) => `<option value="${item.id}">${item.name} (${item.code})</option>`).join(''); updatePrice(); }
+        function updatePrice() { const product = products.find((item) => item.id === Number(productSelect.value)); unitPrice.value = product ? product.price : 0; total.textContent = `Total: Rs. ${(Number(unitPrice.value || 0) * Number(quantity.value || 0)).toFixed(2)}`; }
+        async function render() { try { const result = await requestJson('/api/sales'); rows.innerHTML = result.sales.map((sale) => `<tr><td>${sale.order_number}</td><td>${sale.customer_name}</td><td>${sale.product_name}</td><td>${sale.quantity}</td><td>Rs. ${Number(sale.total).toFixed(2)}</td><td class="status ${sale.status.toLowerCase()}">${sale.status}</td><td>${sale.status === 'Pending' ? `<button type="button" data-process="${sale.id}">Process Sale</button>` : `<a href="/api/sales/${sale.id}/invoice.pdf">Download Invoice</a>`}</td></tr>`).join(''); document.getElementById('orderCount').textContent = `${result.sales.length} order${result.sales.length === 1 ? '' : 's'}`; document.getElementById('emptyMessage').hidden = result.sales.length > 0; } catch (error) { message.textContent = error.message; } }
+        document.getElementById('salesForm').addEventListener('submit', async (event) => { event.preventDefault(); try { await requestJson('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customer_id: customerSelect.value, product_id: productSelect.value, quantity: Number(quantity.value), unit_price: Number(unitPrice.value) }) }); event.target.reset(); message.textContent = ''; updatePrice(); await render(); } catch (error) { message.textContent = error.message; } });
+        rows.addEventListener('click', async (event) => { const id = event.target.dataset.process; if (!id) return; try { await requestJson(`/api/sales/${id}/process`, { method: 'POST' }); await render(); } catch (error) { message.textContent = error.message; } });
+        productSelect.addEventListener('change', updatePrice); quantity.addEventListener('input', updatePrice); Promise.all([loadOptions(), render()]).catch((error) => { message.textContent = error.message; });
+    </script>
+</body>
+</html>

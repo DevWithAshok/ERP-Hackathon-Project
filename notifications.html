@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Notifications</title>
+    <style>
+        body { margin: 0; background: #f4f7fb; color: #172033; font-family: Arial, sans-serif; }
+        .page { max-width: 900px; margin: auto; padding: 24px; }
+        .panel, .notification { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+        nav { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+        a { color: #1769aa; font-weight: 700; text-decoration: none; }
+        .notification { display: flex; justify-content: space-between; gap: 20px; align-items: center; border-left: 4px solid #b42318; }
+        .notification h2 { margin: 0 0 6px; font-size: 17px; }
+        .notification p { margin: 0; color: #667085; }
+        button { border: 0; border-radius: 5px; padding: 9px 13px; color: white; background: #1769aa; cursor: pointer; font-weight: 700; }
+        .empty { color: #667085; }
+        @media (max-width: 620px) { .notification { align-items: stretch; flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <main class="page">
+        <section class="panel">
+            <nav><a href="/dashboard">Dashboard</a><a href="/inventory">Inventory</a><a href="/audit">Audit Log</a></nav>
+            <h1>Notifications</h1>
+            <p id="status">Loading notifications...</p>
+        </section>
+        <section id="notificationList"></section>
+    </main>
+    <script>
+        async function loadNotifications() {
+            const response = await fetch('/api/notifications');
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Notification request failed.');
+            const list = document.getElementById('notificationList');
+            document.getElementById('status').textContent = `${result.notifications.length} notification(s)`;
+            list.innerHTML = result.notifications.length ? result.notifications.map((item) => `<article class="notification"><div><h2>${item.title}</h2><p>${item.message}</p></div>${item.is_read ? '<span>Read</span>' : `<button data-read="${item.id}">Mark as read</button>`}</article>`).join('') : '<p class="empty">No notifications.</p>';
+        }
+        document.getElementById('notificationList').addEventListener('click', async (event) => { const id = event.target.dataset.read; if (!id) return; await fetch(`/api/notifications/${id}/read`, { method: 'POST' }); await loadNotifications(); });
+        loadNotifications().catch((error) => { document.getElementById('status').textContent = error.message; });
+    </script>
+</body>
+</html>
