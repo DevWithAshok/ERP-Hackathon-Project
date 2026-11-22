@@ -548,3 +548,18 @@ Clear demonstration > unnecessary features
 ```
 
 The target is not to reproduce every feature of a commercial ERP. The target is to demonstrate a believable, connected manufacturing ERP that solves the company's spreadsheet problem and proves the core business logic works.
+
+## 15. Deploying on Railway
+
+The application uses Flask and MySQL. Keep the existing `.env` file local; configure production values in Railway's service variables instead.
+
+1. Review `git status` and commit only the project changes you intend to deploy. Do not stage local `.env` files, generated files, or unrelated work.
+2. In Railway, create a project from this GitHub repository and add a MySQL service.
+3. Configure the web service's `DATABASE_URL` with a private connection URL from the Railway MySQL service. Use Railway's variable-reference controls where available; do not paste database credentials into source files or chat.
+4. Set `SECRET_KEY` in the web service to a newly generated, unpredictable value. Do not reuse the local key.
+5. Before importing the database, check the database name supplied by Railway. `schema.sql` and `seed_data.sql` currently select a database named `manufacturing_erp`; adjust the database selection for the hosted database if its name differs.
+6. Run `schema.sql` and then `seed_data.sql` against the hosted MySQL database. Seed data is for demonstration; change or remove demo account passwords before sharing the public URL.
+7. Deploy the web service. Railway uses the repository's `Procfile` to start Gunicorn and bind to the port provided by the platform.
+8. Check `/health` and `/db-health` on the public HTTPS URL, then test login and the main workflows in a private browser window.
+
+The production server dependency is installed from `requirements.txt`. For local development, continue using `python app.py`; do not use Flask's development server as the public production server.

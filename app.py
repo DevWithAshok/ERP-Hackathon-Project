@@ -77,7 +77,10 @@ def create_app():
     app = Flask(__name__)
 
     # Environment variables keep secrets and machine-specific settings out of code.
-    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "local-development-only")
+    secret_key = os.getenv("SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError("SECRET_KEY is not configured")
+    app.config["SECRET_KEY"] = secret_key
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
         "DATABASE_URL",
         "mysql+pymysql://root@localhost/manufacturing_erp",
@@ -145,6 +148,7 @@ def create_app():
             }
             return jsonify({"message": "Login successful", "user": session["user"]})
         except Exception:
+            app.logger.exception("Login service failed while connecting to the database")
             return jsonify({"error": "Login service is unavailable."}), 503
         finally:
             if connection is not None:
