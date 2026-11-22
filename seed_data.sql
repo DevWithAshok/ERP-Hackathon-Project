@@ -1,8 +1,6 @@
 -- Demo data for the manufacturing ERP.
 -- Run schema.sql before running this file.
 
-USE manufacturing_erp;
-
 -- Passwords are stored as Werkzeug scrypt hashes, never as plain text.
 INSERT INTO users (username, password_hash, role)
 VALUES

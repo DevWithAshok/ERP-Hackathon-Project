@@ -1,11 +1,5 @@
 -- Manufacturing ERP database schema.
--- Run this file in MySQL Workbench or with the MySQL client.
-
-CREATE DATABASE IF NOT EXISTS manufacturing_erp
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE manufacturing_erp;
+-- Select the target database first, then run this file in MySQL Workbench or with the MySQL client.
 
 CREATE TABLE IF NOT EXISTS users (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
